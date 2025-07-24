@@ -5,6 +5,7 @@ from loguru import logger
 from starlette.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
+from src.services.distributor.routes import distributor_router
 
 
 @asynccontextmanager
@@ -26,3 +27,5 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(distributor_router)

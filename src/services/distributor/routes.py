@@ -1,9 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from starlette import status
 
 from src.services.distributor.dto.input import INPUT_NewBotParams
+from src.services.distributor.service import SERVICE_DeployNewBot
 
 distributor_router = APIRouter(prefix="/distributor", tags=["Distribution"])
+
 
 @distributor_router.post(
     "/",
@@ -13,6 +15,6 @@ distributor_router = APIRouter(prefix="/distributor", tags=["Distribution"])
 )
 async def deploy_new_bot(
         model: INPUT_NewBotParams,
-        service: SERVICE_DeployNewBot
+        service: SERVICE_DeployNewBot = Depends()
 ):
     return await service(model)
