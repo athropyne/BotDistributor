@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 
-import loguru
 from fastapi import FastAPI
 from loguru import logger
 from starlette.middleware.cors import CORSMiddleware
