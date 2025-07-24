@@ -12,5 +12,4 @@ class Settings(BaseSettings):
     SERVER_PORT: int = 10000
 
 
-
 settings = Settings()
