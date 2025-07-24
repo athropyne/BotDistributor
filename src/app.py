@@ -1,13 +1,18 @@
 from contextlib import asynccontextmanager
 
+import loguru
 from fastapi import FastAPI
+from loguru import logger
 from starlette.middleware.cors import CORSMiddleware
 
+from src.core.config import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info(f"Server started {settings.SERVER_HOST}:{settings.SERVER_PORT}")
     yield
+    logger.info("Server stopped")
 
 
 app = FastAPI(
@@ -22,7 +27,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.include_router(auth_router)
-app.include_router(user_router)
-app.include_router(email_router)
