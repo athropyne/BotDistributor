@@ -17,6 +17,7 @@ from src.core.interfaces import BaseService
 from src.core.utils import catch_failed_httpx_connection, catch_portainer_unauthorized, parse_response
 from src.services.distributor.dto.input import INPUT_NewBotParams
 from src.services.distributor.dto.output import OUTPUT_NewBotCreated
+from src.services.distributor.exc import BotNotFound
 
 
 class SERVICE_BotContainerManager:
@@ -128,6 +129,12 @@ class SERVICE_DeployNewBot(BaseService):
         headers = {"Authorization": f"Bearer {portainer.access_token}"}
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=60.0)) as client:
+            url = f"https://api.telegram.org/bot{model.bot_token}/getMe"
+            response = await client.get(url)
+            if response.status_code != status.HTTP_200_OK:
+                logger.error(f"Bot {model.bot_token} not found")
+                raise BotNotFound(model.bot_token)
+
             await self.container_manager.pull_image(
                 client,
                 portainer.access_token

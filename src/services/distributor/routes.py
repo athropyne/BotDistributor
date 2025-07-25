@@ -14,9 +14,8 @@ distributor_router = APIRouter(prefix="/distributor", tags=["Distribution"])
     summary="Deploy a new bot",
     description="""
         Launches a new Telegram bot with the parameters specified by the user.
-        All returned errors are related to the server side. 
-        You cannot fix them on the client side! 
-        4xx error codes are only used to better understand what happened.
+        All 5xx errors returned are related to the server side. 
+        You cannot fix them on the client side!
     """,
     status_code=status.HTTP_201_CREATED,
     response_model=OUTPUT_NewBotCreated,
@@ -46,8 +45,15 @@ distributor_router = APIRouter(prefix="/distributor", tags=["Distribution"])
                     "example": {"detail": "Invalid access token"}
                 }
             }
-        }
-
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Client error",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Bot <bot_token> not found"}
+                }
+            }
+        },
     },
     dependencies=[Depends(TokenManager.decode)]
 )

@@ -37,13 +37,9 @@ class TokenManager:
             )
 
     @classmethod
-    def decode(cls, token: str = Depends(auth_scheme)) -> dict:
+    def decode(cls, token: str = Depends(auth_scheme)) -> None:
         try:
-            payload: dict = jwt.decode(token, cls._TOKEN_SECRET_KEY, cls._ALGORITHM, options={"verify_sub": False})
-            user_id = payload.get("id")
-            if user_id is None:
-                raise NotAuthorized(detail="Вы не авторизованы")
-            return payload
+            jwt.decode(token, cls._TOKEN_SECRET_KEY, cls._ALGORITHM, options={"verify_sub": False})
         except jwt.exceptions.ExpiredSignatureError:
             raise ExpiredSignatureError
         except jwt.InvalidTokenError:
