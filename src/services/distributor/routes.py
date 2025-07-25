@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from starlette import status
 
+from src.core.security import TokenManager
 from src.services.distributor.dto.input import INPUT_NewBotParams
 from src.services.distributor.dto.output import OUTPUT_NewBotCreated
 from src.services.distributor.service import SERVICE_DeployNewBot
@@ -25,29 +26,30 @@ distributor_router = APIRouter(prefix="/distributor", tags=["Distribution"])
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "Head \"https://registry-1.docker.io/v2/athropyne/telegram-bot/manifests/latest\": unauthorized: incorrect username or password"}
+                        "detail":
+                            [
+                                'Head \"https://registry-1.docker.io/v2/athropyne/telegram-bot/manifests/latest\": unauthorized: incorrect username or password',
+                                "Authentication in Portainer failed! Invalid login or password",
+                                "Invalid Portainer token",
+                                "Image not pulled. <detail>",
+                                "Container not created",
+                                "Container not started",
+                                "..."
+                            ]}
                 }
             }
         },
-        status.HTTP_404_NOT_FOUND: {
-            "description": "Resource not found. Returns if an incorrect PORTAINER_URL is specified or the ID of the Portainer virtual environment is incorrectly specified or calculated",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Unable to find an environment with the specified identifier inside the database"}
-                }
-            }
-        },
-
         status.HTTP_401_UNAUTHORIZED: {
-            "description": "Authentication error in Portainer. Returns if the server could not authenticate itself in Portainer",
+            "description": "Authentication error",
             "content": {
                 "application/json": {
-                    "example": {"detail": "Invalid Portainer token."}
+                    "example": {"detail": "Invalid access token"}
                 }
             }
         }
-    }
+
+    },
+    dependencies=[Depends(TokenManager.decode)]
 )
 async def deploy_new_bot(
         model: INPUT_NewBotParams,

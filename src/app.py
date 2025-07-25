@@ -9,6 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from src.core.config import settings
 from src.core.exc import PortainerAuthFailed
 from src.core.infrastructures import portainer
+from src.services.auth.routes import auth_router
 from src.services.distributor.routes import distributor_router
 
 
@@ -44,4 +45,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(distributor_router)

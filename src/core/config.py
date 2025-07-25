@@ -21,7 +21,14 @@ class Settings(BaseSettings):
     DOCKERHUB_USERNAME: str | None = None
     DOCKERHUB_PASSWORD: str | None = None
     IMAGE: str
-    # SERVER_ADDRESS: str = "https://index.docker.io/v1/"
+
+    # admin panel
+    ADMIN_PANEL_USERNAME: str
+    ADMIN_PANEL_PASSWORD: str
+
+    # access token
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    TOKEN_SECRET_KEY: str
 
 
 settings = Settings()

@@ -3,13 +3,15 @@ from functools import wraps
 from typing import Callable
 
 import httpx
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from httpx import Response
 from loguru import logger
 from starlette import status
 
 from src.core.exc import PortainerUnauthorized
 from src.core.infrastructures import portainer
+from src.services.auth.dto.input import INPUT_AuthData
 
 
 def catch_failed_httpx_connection(func: Callable):
@@ -51,3 +53,7 @@ def parse_response(response: Response):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="Response parsing error")
     return detail
+
+
+def convert_auth_data(data: OAuth2PasswordRequestForm = Depends(OAuth2PasswordRequestForm)):
+    return INPUT_AuthData(login=data.username, password=data.password)

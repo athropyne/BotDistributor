@@ -9,7 +9,7 @@ from loguru import logger
 from starlette import status
 
 from src.core.config import settings
-from src.core.exc import NotFound, DockerhubAuthFailed, PortainerUnauthorized, ImageNotPulled, ContainerNotCreated, \
+from src.core.exc import InvalidURL, DockerhubAuthFailed, PortainerUnauthorized, ImageNotPulled, ContainerNotCreated, \
     ContainerNotStarted
 from src.core.infrastructures import portainer
 from src.core.infrastructures.portainer import PortainerClient
@@ -52,7 +52,7 @@ class SERVICE_BotContainerManager:
                 case status.HTTP_500_INTERNAL_SERVER_ERROR:
                     raise DockerhubAuthFailed(detail)
                 case status.HTTP_404_NOT_FOUND:
-                    raise NotFound(detail)
+                    raise InvalidURL(detail)
                 case status.HTTP_401_UNAUTHORIZED:
                     raise PortainerUnauthorized
                 case _:
@@ -83,7 +83,7 @@ class SERVICE_BotContainerManager:
             detail = parse_response(create_resp)
             match create_resp.status_code:
                 case status.HTTP_404_NOT_FOUND:
-                    raise NotFound(detail)
+                    raise InvalidURL(detail)
                 case status.HTTP_401_UNAUTHORIZED:
                     raise PortainerUnauthorized
                 case _:
@@ -108,7 +108,7 @@ class SERVICE_BotContainerManager:
             detail = parse_response(start_resp)
             match start_resp.status_code:
                 case status.HTTP_404_NOT_FOUND:
-                    raise NotFound(detail)
+                    raise InvalidURL(detail)
                 case status.HTTP_401_UNAUTHORIZED:
                     raise PortainerUnauthorized
                 case _:

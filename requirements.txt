@@ -2,3 +2,4 @@ fastapi[standard]
 pydantic-settings
 python-dotenv
 loguru
+pyjwt~=2.10.1
