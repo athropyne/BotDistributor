@@ -15,12 +15,13 @@ class Settings(BaseSettings):
     PORTAINER_URL: str
     PORTAINER_USERNAME: str
     PORTAINER_PASSWORD: str
+    PORTAINER_ENDPOINT_ID: int | None = None
 
     # dockerhub
-    DOCKERHUB_USERNAME: str
-    DOCKERHUB_PASSWORD: str  # password or token
+    DOCKERHUB_USERNAME: str | None = None
+    DOCKERHUB_PASSWORD: str | None = None
     IMAGE: str
-    SERVER_ADDRESS: str = "https://index.docker.io/v1/"
+    # SERVER_ADDRESS: str = "https://index.docker.io/v1/"
 
 
 settings = Settings()

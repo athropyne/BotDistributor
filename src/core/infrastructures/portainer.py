@@ -1,21 +1,46 @@
 import httpx
 from fastapi import HTTPException
+from loguru import logger
+from starlette import status
+
+from src.core.config import settings
+from src.core.exc import PortainerAuthFailed, PortainerUnauthorized
 
 
 class PortainerClient:
     def __init__(
             self,
-            portainer_url: str
+            portainer_url: str,
+            portainer_username: str,
+            portainer_password: str,
+            portainer_environment_id: int | None = None
     ):
-        self.portainer_url = portainer_url
+        self.url = portainer_url
+        self.username = portainer_username
+        self.password = portainer_password
+        self.access_token: str | None = None
+        self.environment_id: int | None = portainer_environment_id
 
-    async def auth(self, username: str, password: str) -> str:
+    async def auth(self) -> str:
         async with httpx.AsyncClient(verify=False) as client:
-            resp = await client.post(f"{self.portainer_url}/api/auth", json={
-                "Username": username,
-                "Password": password
+            response = await client.post(f"{self.url}/api/auth", json={
+                "Username": self.username,
+                "Password": self.password
             })
-            print(resp.text)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=500, detail="Auth failed")
-            return resp.json()["jwt"]
+            if response.status_code != 200:
+                raise PortainerAuthFailed
+            self.access_token = response.json()["jwt"]
+            return self.access_token
+
+    async def get_environment_id(self, auth_header: dict) -> int:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{settings.PORTAINER_URL}/api/endpoints", headers=auth_header)
+            if response.status_code == status.HTTP_401_UNAUTHORIZED:
+                logger.debug(response.json())
+                await self.auth()
+                logger.debug("Successful reauth")
+            for ep in response.json():
+                if ep["Name"] == "local":
+                    self.environment_id = ep["Id"]
+                    return self.environment_id
+            raise Exception("Endpoint 'local' not found")
