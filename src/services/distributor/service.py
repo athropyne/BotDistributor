@@ -91,7 +91,7 @@ class SERVICE_BotContainerManager:
 
         container_id = create_resp.json()["Id"]
         logger.info(f"Container {container_id} created")
-        return container_id
+        return container_id, container_name
 
     @catch_failed_httpx_connection
     @catch_portainer_unauthorized
@@ -132,11 +132,11 @@ class SERVICE_DeployNewBot(BaseService):
                 client,
                 portainer.access_token
             )
-            container_id = await self.container_manager.create(
+            container_id, container_name = await self.container_manager.create(
                 client,
                 portainer.environment_id,
                 model.bot_token,
                 headers
             )
             await self.container_manager.start(client, portainer.environment_id, container_id, headers)
-            return OUTPUT_NewBotCreated(container_id=container_id)
+            return OUTPUT_NewBotCreated(container_id=container_id, container_name=container_name)
