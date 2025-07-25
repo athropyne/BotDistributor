@@ -40,7 +40,7 @@ distributor_router = APIRouter(prefix="/distributor", tags=["Distribution"])
         },
 
         status.HTTP_401_UNAUTHORIZED: {
-            "description": "Ошибка аутентификации в Portainer. Возвращается если сервер не смог самостоятельно аутентифицироваться  в Portainer ",
+            "description": "Authentication error in Portainer. Returns if the server could not authenticate itself in Portainer",
             "content": {
                 "application/json": {
                     "example": {"detail": "Invalid Portainer token."}
