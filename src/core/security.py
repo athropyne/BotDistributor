@@ -1,6 +1,5 @@
 import datetime
 from datetime import timedelta, timezone
-from enum import Enum, auto
 
 import jwt
 from fastapi import HTTPException, Depends
@@ -9,8 +8,7 @@ from loguru import logger
 from starlette import status
 
 from src.core import config
-from src.core.exc import ExpiredSignatureError, InvalidTokenError, NotAuthorized
-from src.core.types import ID
+from src.core.exc import ExpiredSignatureError, InvalidTokenError
 
 auth_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -44,8 +42,3 @@ class TokenManager:
             raise ExpiredSignatureError
         except jwt.InvalidTokenError:
             raise InvalidTokenError
-
-    @classmethod
-    def id(cls, token: str = Depends(auth_scheme)) -> ID:
-        payload = cls.decode(token)
-        return ID(payload["id"])
