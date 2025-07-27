@@ -44,3 +44,19 @@ class PortainerClient:
                     self.environment_id = ep["Id"]
                     return self.environment_id
             raise Exception("Endpoint 'local' not found")
+
+    async def init(self):
+        try:
+            await self.auth()
+            if settings.PORTAINER_ENDPOINT_ID is None:
+                await self.get_environment_id({"Authorization": f"Bearer {self.access_token}"})
+            else:
+                self.environment_id = settings.PORTAINER_ENDPOINT_ID
+        except (httpx.ConnectError, httpx.InvalidURL) as e:
+            logger.error("Invalid Portainer URL")
+            raise RuntimeError("Portainer is not available. Invalid Portainer URL")
+        except PortainerAuthFailed as e:
+            logger.error(e.detail)
+            raise
+        async with httpx.AsyncClient() as client:
+            pass
