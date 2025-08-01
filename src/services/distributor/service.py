@@ -74,7 +74,7 @@ class SERVICE_BotContainerManager:
                      bot_token: str,
                      bot_title: str,
                      bot_username: str,
-                     creator_id: str,
+                     creator_id: int,
                      bot_link: str,
                      headers: dict):
         container_name = f"telegram_bot_{uuid.uuid4().hex[:8]}"
