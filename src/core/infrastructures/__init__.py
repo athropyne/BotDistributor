@@ -7,4 +7,4 @@ portainer = PortainerClient(
     settings.PORTAINER_USERNAME,
     settings.PORTAINER_PASSWORD
 )
-http_client = HttpClient(60.0, read=60.0)
+http_client = HttpClient()

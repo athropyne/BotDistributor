@@ -45,6 +45,13 @@ class ImageNotPulled(InternalError):
         )
 
 
+class EndpointsListNotReceived(InternalError):
+    def __init__(self, detail: str):
+        super().__init__(
+            detail=f"The list of endpoints has not been received"
+        )
+
+
 class ContainerNotCreated(InternalError):
     def __init__(self):
         super().__init__(

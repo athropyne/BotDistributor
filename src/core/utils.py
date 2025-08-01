@@ -33,6 +33,7 @@ def catch_failed_httpx_connection(func: Callable):
 
 def catch_portainer_unauthorized(func: Callable):
     @wraps(func)
+    @catch_failed_httpx_connection
     async def wrapper(*args, **kwargs):
         try:
             result = await func(*args, **kwargs)

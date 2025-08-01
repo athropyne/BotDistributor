@@ -12,9 +12,9 @@ class Settings(BaseSettings):
     SERVER_PORT: int
 
     # portainer
-    PORTAINER_URL: str
-    PORTAINER_USERNAME: str
-    PORTAINER_PASSWORD: str
+    PORTAINER_URL: str = "http://localhost:9000"
+    PORTAINER_USERNAME: str = "admin"
+    PORTAINER_PASSWORD: str = "012345678910"
     PORTAINER_ENDPOINT_ID: int | None = None
 
     # dockerhub

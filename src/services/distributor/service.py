@@ -9,8 +9,14 @@ from loguru import logger
 from starlette import status
 
 from src.core.config import settings
-from src.core.exc import InvalidURL, DockerhubAuthFailed, PortainerUnauthorized, ImageNotPulled, ContainerNotCreated, \
+from src.core.exc import (
+    InvalidURL,
+    DockerhubAuthFailed,
+    PortainerUnauthorized,
+    ImageNotPulled,
+    ContainerNotCreated,
     ContainerNotStarted
+)
 from src.core.infrastructures import portainer
 from src.core.infrastructures.portainer import PortainerClient
 from src.core.interfaces import BaseService
@@ -66,12 +72,23 @@ class SERVICE_BotContainerManager:
                      client: AsyncClient,
                      environment_id: int,
                      bot_token: str,
+                     bot_title: str,
+                     bot_username: str,
+                     creator_id: str,
+                     bot_link: str,
                      headers: dict):
         container_name = f"telegram_bot_{uuid.uuid4().hex[:8]}"
         create_url = f"{settings.PORTAINER_URL}/api/endpoints/{environment_id}/docker/containers/create?name={container_name}"
         payload = {
             "Image": f"{settings.IMAGE}",
-            "Env": [f"BOT_TOKEN={bot_token}"],
+            "Env": [
+                f"BOT_TOKEN={bot_token}",
+                f"TITLE_BOT={bot_title}",
+                f"USERNAME_BOT={bot_username}",
+                f"CREATOR_USER_ID={creator_id}",
+                f"BOT_LINK={bot_link}",
+
+            ],
             "HostConfig": {
                 "RestartPolicy": {"Name": "unless-stopped"}
             }
@@ -128,6 +145,7 @@ class SERVICE_DeployNewBot(BaseService):
     async def check_valid_token(self, client: AsyncClient, bot_token: str):
         url = f"https://api.telegram.org/bot{bot_token}/getMe"
         response = await client.get(url)
+        logger.debug(response.status_code)
         if response.status_code != status.HTTP_200_OK:
             logger.error(f"Bot {bot_token} not found")
             raise BotNotFound(bot_token)
@@ -145,6 +163,10 @@ class SERVICE_DeployNewBot(BaseService):
                 client,
                 portainer.environment_id,
                 model.bot_token,
+                bot_title,
+                bot_username,
+                creator_id,
+                bot_link,
                 headers
             )
             await self.container_manager.start(client, portainer.environment_id, container_id, headers)
