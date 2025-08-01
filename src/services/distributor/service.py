@@ -163,10 +163,10 @@ class SERVICE_DeployNewBot(BaseService):
                 client,
                 portainer.environment_id,
                 model.bot_token,
-                bot_title,
-                bot_username,
-                creator_id,
-                bot_link,
+                model.bot_title,
+                model.bot_username,
+                model.creator_id,
+                model.bot_link,
                 headers
             )
             await self.container_manager.start(client, portainer.environment_id, container_id, headers)
