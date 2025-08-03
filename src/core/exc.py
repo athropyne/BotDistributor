@@ -53,16 +53,16 @@ class EndpointsListNotReceived(InternalError):
 
 
 class ContainerNotCreated(InternalError):
-    def __init__(self):
+    def __init__(self, detail: str):
         super().__init__(
-            detail="Container not created"
+            detail=f"Container not created. {detail}"
         )
 
 
 class ContainerNotStarted(InternalError):
-    def __init__(self):
+    def __init__(self, detail: str):
         super().__init__(
-            detail="Container not started"
+            detail=f"Container not started. {detail}"
         )
 
 

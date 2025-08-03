@@ -9,8 +9,6 @@ from httpx import Response
 from loguru import logger
 from starlette import status
 
-from src.core.exc import PortainerUnauthorized
-from src.core.infrastructures import portainer
 from src.services.auth.dto.input import INPUT_AuthData
 
 
@@ -27,20 +25,6 @@ def catch_failed_httpx_connection(func: Callable):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal error. Portainer is not available"
             )
-
-    return wrapper
-
-
-def catch_portainer_unauthorized(func: Callable):
-    @wraps(func)
-    @catch_failed_httpx_connection
-    async def wrapper(*args, **kwargs):
-        try:
-            result = await func(*args, **kwargs)
-            return result
-        except PortainerUnauthorized:
-            await portainer.auth()
-            return await func(*args, **kwargs)
 
     return wrapper
 

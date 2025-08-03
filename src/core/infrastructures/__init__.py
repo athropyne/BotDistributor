@@ -1,10 +1,7 @@
-from src.core.config import settings
 from src.core.infrastructures.http_client import HttpClient
-from src.core.infrastructures.portainer import PortainerClient
+from src.core.infrastructures.portainer import Portainer
 
-portainer = PortainerClient(
-    settings.PORTAINER_URL,
-    settings.PORTAINER_USERNAME,
-    settings.PORTAINER_PASSWORD
-)
+
+portainer = Portainer()
 http_client = HttpClient()
+

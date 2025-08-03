@@ -1,173 +1,190 @@
 import base64
 import json
 import uuid
+from functools import wraps
+from typing import Callable
 
 import httpx
-from fastapi import Depends
+from fastapi import HTTPException
 from httpx import AsyncClient
 from loguru import logger
 from starlette import status
 
 from src.core.config import settings
 from src.core.exc import (
-    InvalidURL,
-    DockerhubAuthFailed,
     PortainerUnauthorized,
     ImageNotPulled,
     ContainerNotCreated,
-    ContainerNotStarted
+    ContainerNotStarted, PortainerAuthFailed, EndpointsListNotReceived
 )
 from src.core.infrastructures import portainer
-from src.core.infrastructures.portainer import PortainerClient
 from src.core.interfaces import BaseService
-from src.core.utils import catch_failed_httpx_connection, catch_portainer_unauthorized, parse_response
 from src.services.distributor.dto.input import INPUT_NewBotParams
 from src.services.distributor.dto.output import OUTPUT_NewBotCreated
 from src.services.distributor.exc import BotNotFound
 
 
-class SERVICE_BotContainerManager:
-    def __init__(self,
-                 portainer_client: PortainerClient = Depends(lambda: portainer)):
-        super().__init__()
-        self.portainer = portainer_client
+def catch_portainer_unauthorized(func: Callable):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            result = await func(*args, **kwargs)
+            return result
+        except PortainerUnauthorized:
+            async with httpx.AsyncClient() as client:
+                await auth(client)
+                return await func(*args, **kwargs)
 
-    @catch_failed_httpx_connection
-    @catch_portainer_unauthorized
-    async def pull_image(self,
-                         client: AsyncClient,
-                         token: str
-                         ):
-        auth_config = {
-            "username": f"{settings.DOCKERHUB_USERNAME}",
-            "password": f"{settings.DOCKERHUB_PASSWORD}"
+    return wrapper
+
+
+async def auth(http_client: AsyncClient):
+    url = f"{portainer.url}/api/auth"
+    data = {
+        "Username": portainer.username,
+        "Password": portainer.password
+    }
+    response = await http_client.post(url, json=data)
+    if response.status_code != status.HTTP_200_OK:
+        logger.error(response.text)
+        raise PortainerAuthFailed
+    access_token = response.json()["jwt"]
+    portainer.access_token = access_token
+    return portainer.access_token
+
+
+@catch_portainer_unauthorized
+async def get_environment_id(client: AsyncClient) -> int:
+    headers = {"Authorization": f"Bearer {portainer.access_token}"}
+    response = await client.get(f"{settings.PORTAINER_URL}/api/endpoints", headers=headers)
+    if response.status_code == status.HTTP_401_UNAUTHORIZED:
+        raise PortainerUnauthorized
+    if response.status_code != status.HTTP_200_OK:
+        detail = response.text
+        logger.error(detail)
+        raise EndpointsListNotReceived(detail=detail)
+    for ep in response.json():
+        if ep["Name"] == "local":
+            portainer.environment_id = ep["Id"]
+            return portainer.environment_id
+    raise Exception("Endpoint 'local' not found")
+
+
+@catch_portainer_unauthorized
+async def pull_image(
+        http_client: AsyncClient,
+):
+    auth_config = {
+        "username": f"{settings.DOCKERHUB_USERNAME}",
+        "password": f"{settings.DOCKERHUB_PASSWORD}"
+    }
+    encoded_auth = base64.b64encode(json.dumps(auth_config).encode()).decode()
+    headers = {
+        "Authorization": f"Bearer {portainer.access_token}",
+        "X-Registry-Auth": encoded_auth
+    }
+
+    image_pull_url = f"{portainer.url}/api/endpoints/{portainer.environment_id}/docker/images/create?fromImage={settings.IMAGE}"
+
+    response = await http_client.post(image_pull_url, headers=headers)
+    if response.status_code == status.HTTP_401_UNAUTHORIZED:
+        raise PortainerUnauthorized
+    if response.status_code != status.HTTP_200_OK:
+        detail = response.text
+        logger.error(detail)
+        raise ImageNotPulled(detail=detail)
+    logger.info(f"Image {settings.IMAGE} pulled")
+
+
+@catch_portainer_unauthorized
+async def create(
+        client: AsyncClient,
+        container_name: str,
+        environment_id: int,
+        bot_token: str,
+        bot_title: str,
+        bot_username: str,
+        creator_id: int,
+        bot_link: str):
+    url = f"{settings.PORTAINER_URL}/api/endpoints/{environment_id}/docker/containers/create?name={container_name}"
+    payload = {
+        "Image": f"{settings.IMAGE}",
+        "Env": [
+            f"BOT_TOKEN={bot_token}",
+            f"TITLE_BOT={bot_title}",
+            f"USERNAME_BOT={bot_username}",
+            f"CREATOR_USER_ID={creator_id}",
+            f"BOT_LINK={bot_link}",
+
+        ],
+        "HostConfig": {
+            "RestartPolicy": {"Name": "unless-stopped"}
         }
-        encoded_auth = base64.b64encode(json.dumps(auth_config).encode()).decode()
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "X-Registry-Auth": encoded_auth
-        }
+    }
+    headers = {"Authorization": f"Bearer {portainer.access_token}"}
+    response = await client.post(url, headers=headers, json=payload)
+    if response.status_code == status.HTTP_401_UNAUTHORIZED:
+        raise PortainerUnauthorized
+    if response.status_code != status.HTTP_200_OK:
+        detail = response.text
+        logger.error(detail)
+        raise ContainerNotCreated(detail=detail)
 
-        image_pull_url = f"{settings.PORTAINER_URL}/api/endpoints/{portainer.environment_id}/docker/images/create?fromImage={settings.IMAGE}"
+    container_id = response.json()["Id"]
+    logger.info(f"Container {container_id} created")
+    return container_id
 
-        pull_resp = await client.post(image_pull_url, headers=headers)
-        if pull_resp.status_code != status.HTTP_200_OK:
-            logger.debug(pull_resp.status_code)
-            logger.debug(pull_resp.text)
-            detail = parse_response(pull_resp)
-            match pull_resp.status_code:
-                case status.HTTP_500_INTERNAL_SERVER_ERROR:
-                    raise DockerhubAuthFailed(detail)
-                case status.HTTP_404_NOT_FOUND:
-                    raise InvalidURL(detail)
-                case status.HTTP_401_UNAUTHORIZED:
-                    raise PortainerUnauthorized
-                case _:
-                    raise ImageNotPulled(detail)
-        logger.info(f"Image {settings.IMAGE} pulled")
 
-    @catch_failed_httpx_connection
-    @catch_portainer_unauthorized
-    async def create(self,
-                     client: AsyncClient,
-                     environment_id: int,
-                     bot_token: str,
-                     bot_title: str,
-                     bot_username: str,
-                     creator_id: int,
-                     bot_link: str,
-                     headers: dict):
-        container_name = f"telegram_bot_{uuid.uuid4().hex[:8]}"
-        create_url = f"{settings.PORTAINER_URL}/api/endpoints/{environment_id}/docker/containers/create?name={container_name}"
-        payload = {
-            "Image": f"{settings.IMAGE}",
-            "Env": [
-                f"BOT_TOKEN={bot_token}",
-                f"TITLE_BOT={bot_title}",
-                f"USERNAME_BOT={bot_username}",
-                f"CREATOR_USER_ID={creator_id}",
-                f"BOT_LINK={bot_link}",
+@catch_portainer_unauthorized
+async def start(client: AsyncClient,
+                environment_id: int,
+                container_id: str):
+    start_url = f"{settings.PORTAINER_URL}/api/endpoints/{environment_id}/docker/containers/{container_id}/start"
+    headers = {"Authorization": f"Bearer {portainer.access_token}"}
+    response = await client.post(start_url, headers=headers)
+    if response.status_code == status.HTTP_401_UNAUTHORIZED:
+        raise PortainerUnauthorized
+    if response.status_code != status.HTTP_204_NO_CONTENT:
+        detail = response.text
+        logger.error(detail)
+        raise ContainerNotStarted(detail=detail)
+    logger.info(f"Container {container_id} started")
 
-            ],
-            "HostConfig": {
-                "RestartPolicy": {"Name": "unless-stopped"}
-            }
-        }
-        create_resp = await client.post(create_url, headers=headers, json=payload)
-        if create_resp.status_code != 200:
-            logger.debug(create_resp.status_code)
-            logger.debug(create_resp.text)
 
-            detail = parse_response(create_resp)
-            match create_resp.status_code:
-                case status.HTTP_404_NOT_FOUND:
-                    raise InvalidURL(detail)
-                case status.HTTP_401_UNAUTHORIZED:
-                    raise PortainerUnauthorized
-                case _:
-                    raise ContainerNotCreated
-
-        container_id = create_resp.json()["Id"]
-        logger.info(f"Container {container_id} created")
-        return container_id, container_name
-
-    @catch_failed_httpx_connection
-    @catch_portainer_unauthorized
-    async def start(self,
-                    client: AsyncClient,
-                    environment_id: int,
-                    container_id: str,
-                    headers: dict):
-        start_url = f"{settings.PORTAINER_URL}/api/endpoints/{environment_id}/docker/containers/{container_id}/start"
-        start_resp = await client.post(start_url, headers=headers)
-        if start_resp.status_code != 204:
-            logger.debug(start_resp.status_code)
-            logger.debug(start_resp.text)
-            detail = parse_response(start_resp)
-            match start_resp.status_code:
-                case status.HTTP_404_NOT_FOUND:
-                    raise InvalidURL(detail)
-                case status.HTTP_401_UNAUTHORIZED:
-                    raise PortainerUnauthorized
-                case _:
-                    raise ContainerNotStarted
-        logger.info(f"Container {container_id} started")
+async def check_valid_token(client: AsyncClient, bot_token: str):
+    url = f"https://api.telegram.org/bot{bot_token}/getMe"
+    response = await client.get(url)
+    logger.debug(response.status_code)
+    if response.status_code != status.HTTP_200_OK:
+        logger.error(f"Bot {bot_token} not found")
+        raise BotNotFound(bot_token)
 
 
 class SERVICE_DeployNewBot(BaseService):
-    def __init__(self,
-                 portainer_client: PortainerClient = Depends(lambda: portainer),
-                 container_manager: SERVICE_BotContainerManager = Depends()):
-        super().__init__()
-        self.portainer_client = portainer_client
-        self.container_manager = container_manager
-
-    async def check_valid_token(self, client: AsyncClient, bot_token: str):
-        url = f"https://api.telegram.org/bot{bot_token}/getMe"
-        response = await client.get(url)
-        logger.debug(response.status_code)
-        if response.status_code != status.HTTP_200_OK:
-            logger.error(f"Bot {bot_token} not found")
-            raise BotNotFound(bot_token)
-
     async def __call__(self, model: INPUT_NewBotParams):
-        headers = {"Authorization": f"Bearer {portainer.access_token}"}
-
-        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=60.0)) as client:
-            await self.check_valid_token(client, model.bot_token)
-            await self.container_manager.pull_image(
-                client,
-                portainer.access_token
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=60.0)) as client:
+                await check_valid_token(client, model.bot_token)
+                if not portainer.environment_id:
+                    await get_environment_id(client)
+                await pull_image(client)
+                container_name = f"telegram_bot_{uuid.uuid4().hex[:8]}"
+                container_id = await create(
+                    client,
+                    container_name,
+                    portainer.environment_id,
+                    model.bot_token,
+                    model.bot_title,
+                    model.bot_username,
+                    model.creator_id,
+                    model.bot_link
+                )
+                await start(client, portainer.environment_id, container_id)
+                return OUTPUT_NewBotCreated(container_id=container_id, container_name=container_name)
+        except httpx.ConnectError as e:
+            logger.error("Portainer is not available")
+            logger.error(e)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal error. Portainer is not available"
             )
-            container_id, container_name = await self.container_manager.create(
-                client,
-                portainer.environment_id,
-                model.bot_token,
-                model.bot_title,
-                model.bot_username,
-                model.creator_id,
-                model.bot_link,
-                headers
-            )
-            await self.container_manager.start(client, portainer.environment_id, container_id, headers)
-            return OUTPUT_NewBotCreated(container_id=container_id, container_name=container_name)

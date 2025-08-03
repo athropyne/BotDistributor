@@ -15,11 +15,11 @@ class Settings(BaseSettings):
     PORTAINER_URL: str = "http://localhost:9000"
     PORTAINER_USERNAME: str = "admin"
     PORTAINER_PASSWORD: str = "012345678910"
-    PORTAINER_ENDPOINT_ID: int | None = None
+    PORTAINER_ENDPOINT_ID: int | None = 3
 
     # dockerhub
-    DOCKERHUB_USERNAME: str | None = None
-    DOCKERHUB_PASSWORD: str | None = None
+    DOCKERHUB_USERNAME: str | None = "athropyne"
+    DOCKERHUB_PASSWORD: str | None = "dckr_pat_2yHx97iNNAiHOmZ5byIH5F0jVBs"
     IMAGE: str
 
     # admin panel
